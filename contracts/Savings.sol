@@ -20,6 +20,19 @@ contract Savings {
     s_owner = msg.sender;
   }
 
+//  deposit
+  function deposit(address _contractAddr, uint256 _amount) external{
+//      if the owner of the contract has that amount in dai
+//    approve the contract to save the chosen _amount
+//    transfer chosen amount from the owner to the contract
+//    calculate interest to be gained of the blockxafe token
+
+  }
+
+  function withdraw() internal{
+// use chainlink keepers to track the amount of time needed for withdrawal
+  }
+
   function getSavingsName() public view returns (string memory) {
     return i_savingsName;
   }
