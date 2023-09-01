@@ -4,89 +4,124 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "./PriceConverter.sol";
 
-//Connect user wallet to dApp
-//Allow user create and customise saving plan
-//Allow user deploy a savings contract
-//Allow user approve the contract to take and store funds for a particular amount of time
-//Display user funds when they connect to the dApp after funding
-//Allow user to withdraw funds from immediate savings
-//Deposit funds back to user when time for saving elapses and also send incentive token
-//Allow user to stake stable tokens for monthly or yearly time period
-//Deposit funds to user address after staking time elapses
+// user connects wallet
+// user deploys savings contract with the savings name and the chosen stable token
+// when deployed, smart contract automatically creates a general savings
+// user can deposit into the savings contract
+// user can then create a new savings box
+// user can deposit into the newly created savings box and set a  timer
+// user can see the total savings
 
-
-// deploy contract
-// desposit funds:
-//- approve transfer of funds from saver to the contract --- outside the contract
-//- transfer funds from saver to contract
-//- approve the transfer of funds from the contract to the saver --- outside the contract
-// withdraw funds:
-//- chainlink keepers check for unlock time to elapse
-//- when time elapses, it calls the withdraw function which transfer saved funds from contract to saver
-//- It also mints the blockxafe token to the saver
-
-
+error Savings__NotEqualEtherForFee();
 error Savings__UnlockTimeNotReached();
+error Savings__TransactionFailed();
 
 contract Savings is Ownable {
-  using SafeERC20 for IERC20;
+    // Type Declarations
+    using PriceConverter for uint256;
+    using SafeERC20 for IERC20;
 
-
-  string private  s_savingsName;
-  address private immutable i_owner;
-  address private immutable i_stableTokenAddress;
-  address private s_contractAddr;
-  uint256 private immutable i_unlockTime;
-
-
-  event FundsDesposited(address indexed saver, uint amount);
-  event FundsWithdrawn(address indexed saver, uint amount);
-
-
-  constructor(string memory _savingsName, address _stableTokenAddress, uint256 _unlockTime) {
-    s_savingsName = _savingsName;
-    i_owner = msg.sender;
-    i_stableTokenAddress = _stableTokenAddress;
-    i_unlockTime = _unlockTime;
-  }
-
-//  deposit
-  function deposit(address _contractAddr, uint256 _amount) external onlyOwner{
-
-    s_contractAddr = _contractAddr;
-
-//    transfer the savings money from the saver to the contract
-    IERC20(i_stableTokenAddress).safeTransferFrom(i_owner,_contractAddr,_amount);
-
-    emit FundsDesposited(i_owner, _amount);
-  }
-
-  function withdraw() external onlyOwner{
-    bool timePassed = block.timestamp >= i_unlockTime;
-    if(!timePassed){
-      revert Savings__UnlockTimeNotReached();
+    struct SavingPlan {
+        string savingPlanName;
+        uint256 total;
+        uint256 target;
+        uint256 unlockTime;
     }
 
-//    get the contract balance of the stable token
-    uint256 contractBalance = IERC20(i_stableTokenAddress).balanceOf(s_contractAddr);
-//    transfer the saved money from the contract to the saver
-    IERC20(i_stableTokenAddress).safeTransferFrom(s_contractAddr,i_owner,contractBalance);
+    string private s_savingsName;
+    address private immutable i_owner;
+    address private immutable i_stableTokenAddress;
+    address private s_contractAddr;
+    mapping(uint256 => SavingPlan) private s_idToSavingPlan;
+    uint256 private s_savingPlansCounter;
+    uint256 public constant DEPLOY_FEE = 1 * 10 ** 18;
 
-    emit FundsWithdrawn(i_owner, contractBalance);
-  }
+    event FundsDesposited(address indexed saver, uint256 amount);
+    event FundsWithdrawn(address indexed saver, uint256 amount);
 
+    constructor(
+        string memory _savingsName,
+        address _stableTokenAddress,
+        address priceFeed,
+        address blockxafe
+    ) payable {
+        if (msg.value.getConversionRate(AggregatorV3Interface(priceFeed)) != DEPLOY_FEE) {
+            revert Savings__NotEqualEtherForFee();
+        }
 
-  function getSavingsName() public view returns (string memory) {
-    return s_savingsName;
-  }
+        (bool callSuccess, ) = blockxafe.call{value: msg.value}("");
+        if (!callSuccess) revert Savings__TransactionFailed();
 
-  function getContractBalance() public view returns(uint){
-    uint256 contractBalance = IERC20(i_stableTokenAddress).balanceOf(s_contractAddr);
-    return contractBalance;
-  }
+        SavingPlan memory generalSavings = SavingPlan(_savingsName, 0, 0, block.timestamp);
+        s_idToSavingPlan[s_savingPlansCounter] = generalSavings;
 
-  function getUnlockTime() public view returns(uint){
-    return i_unlockTime;
-  }
+        s_savingPlansCounter += 1;
+
+        i_owner = msg.sender;
+        i_stableTokenAddress = _stableTokenAddress;
+    }
+
+    function createSavingPlan(
+        string memory _savingsName,
+        uint256 _amount,
+        uint256 _target,
+        uint256 _unlockTime
+    ) external onlyOwner {
+        SavingPlan memory savingPlan = SavingPlan(_savingsName, _amount, _target, _unlockTime);
+        s_idToSavingPlan[s_savingPlansCounter] = savingPlan;
+        s_savingPlansCounter += 1;
+    }
+
+    //  deposit
+    function deposit(uint256 id, address _contractAddr, uint256 _amount) external onlyOwner {
+        s_contractAddr = _contractAddr;
+
+        //    transfer the savings money from the saver to the contract
+        IERC20(i_stableTokenAddress).safeTransferFrom(i_owner, _contractAddr, _amount);
+
+        emit FundsDesposited(i_owner, _amount);
+
+        SavingPlan memory savingPlan = s_idToSavingPlan[id];
+
+        savingPlan.total += _amount;
+    }
+
+    function withdraw(uint id) external onlyOwner {
+        SavingPlan memory savingPlan = s_idToSavingPlan[id];
+
+        bool timePassed = block.timestamp >= savingPlan.unlockTime;
+        if (!timePassed) {
+            revert Savings__UnlockTimeNotReached();
+        }
+
+        //    transfer the saved money from the contract to the saver
+        IERC20(i_stableTokenAddress).safeTransferFrom(s_contractAddr, i_owner, savingPlan.total);
+
+        emit FundsWithdrawn(i_owner, savingPlan.total);
+
+        savingPlan.total = 0;
+    }
+
+    function getSavingPlanName(uint256 id) public view returns (string memory) {
+        SavingPlan memory savingPlan = s_idToSavingPlan[id];
+        return savingPlan.savingPlanName;
+    }
+
+    function getContractBalance() public view returns (uint256) {
+        uint256 contractBalance = IERC20(i_stableTokenAddress).balanceOf(s_contractAddr);
+        return contractBalance;
+    }
+
+    function getUnlockTimeForSavingPlan(uint256 id) public view returns (uint256) {
+        SavingPlan memory savingPlan = s_idToSavingPlan[id];
+        return savingPlan.unlockTime;
+    }
+
+    function getTotalAmountInSavingPlan(uint256 id) public view returns (uint256) {
+        SavingPlan memory savingPlan = s_idToSavingPlan[id];
+        return savingPlan.total;
+    }
 }
