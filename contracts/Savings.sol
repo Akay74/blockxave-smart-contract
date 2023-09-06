@@ -38,24 +38,34 @@ contract Savings is Ownable {
     mapping(uint256 => SavingPlan) private s_idToSavingPlan;
     uint256 private s_savingPlansCounter;
     uint256 public constant DEPLOY_FEE = 1 * 10 ** 18;
+    address private constant BLOCKXAVE_ADDRESS = 0x6fb462259dEE0956FfAE3a87C8481885c2db34bB;
 
     event FundsDesposited(address indexed saver, uint256 amount);
     event FundsWithdrawn(address indexed saver, uint256 amount);
 
     constructor(
         string memory _savingsName,
-        address _stableTokenAddress,
-        address priceFeed,
-        address blockxafe
-    ) payable {
-        if (msg.value.getConversionRate(AggregatorV3Interface(priceFeed)) != DEPLOY_FEE) {
-            revert Savings__NotEqualEtherForFee();
+        address _stableTokenAddress // address priceFeed
+    ) {
+        // if (msg.value.getConversionRate(AggregatorV3Interface(priceFeed)) != DEPLOY_FEE) {
+        //     revert Savings__NotEqualEtherForFee();
+        // }
+
+        // (bool callSuccess, ) = BLOCKXAVE_ADDRESS.call{value: msg.value}("");
+        // if (!callSuccess) revert Savings__TransactionFailed();
+
+        bool callSuccess = IERC20(_stableTokenAddress).transferFrom(
+            msg.sender,
+            BLOCKXAVE_ADDRESS,
+            DEPLOY_FEE
+        );
+        if (!callSuccess) {
+            revert Savings__TransactionFailed();
         }
 
-        (bool callSuccess, ) = blockxafe.call{value: msg.value}("");
-        if (!callSuccess) revert Savings__TransactionFailed();
+        s_savingsName = _savingsName;
 
-        SavingPlan memory generalSavings = SavingPlan(_savingsName, 0, 0, block.timestamp);
+        SavingPlan memory generalSavings = SavingPlan("General savings", 0, 0, block.timestamp);
         s_idToSavingPlan[s_savingPlansCounter] = generalSavings;
 
         s_savingPlansCounter += 1;
@@ -65,14 +75,16 @@ contract Savings is Ownable {
     }
 
     function createSavingPlan(
-        string memory _savingsName,
+        string memory _savingsPlanName,
         uint256 _amount,
         uint256 _target,
         uint256 _unlockTime
-    ) external onlyOwner {
-        SavingPlan memory savingPlan = SavingPlan(_savingsName, _amount, _target, _unlockTime);
+    ) external onlyOwner returns (uint256) {
+        SavingPlan memory savingPlan = SavingPlan(_savingsPlanName, _amount, _target, _unlockTime);
         s_idToSavingPlan[s_savingPlansCounter] = savingPlan;
         s_savingPlansCounter += 1;
+
+        return s_savingPlansCounter - 1;
     }
 
     //  deposit
