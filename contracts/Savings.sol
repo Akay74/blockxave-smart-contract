@@ -15,6 +15,8 @@ import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 // user can see the total savings
 
 error Savings__UnlockTimeNotReached();
+error Savings__DepositFailed();
+error Savings__TransferFailed();
 
 contract Savings is Ownable {
     // Type Declarations
@@ -39,10 +41,7 @@ contract Savings is Ownable {
     event FundsDesposited(address indexed saver, uint256 amount);
     event FundsWithdrawn(address indexed saver, uint256 amount);
 
-    constructor(
-        string memory _savingsName,
-        address _stableTokenAddress // address priceFeed
-    ) {
+    constructor(string memory _savingsName, address _stableTokenAddress) {
         s_savingsName = _savingsName;
 
         SavingPlan memory generalSavings = SavingPlan("General savings", 0, 0, block.timestamp);
@@ -60,14 +59,11 @@ contract Savings is Ownable {
         uint256 _target,
         uint256 _unlockTime
     ) external onlyOwner {
-        // when creating the first saving plan, a payment of 1 usdc or 1dai is made to the blockxafe account
-        if (s_savingPlansCounter <= 1) {
-            s_stableToken.safeTransferFrom(i_owner, BLOCKXAVE_ADDRESS, DEPLOY_FEE);
-        }
+        s_stableToken.transferFrom(i_owner, address(this), _amount);
 
-        s_stableToken.safeTransferFrom(i_owner, address(this), _amount);
+        uint256 unlockTime = block.timestamp + (_unlockTime * 1 days);
 
-        SavingPlan memory savingPlan = SavingPlan(_savingsPlanName, _amount, _target, _unlockTime);
+        SavingPlan memory savingPlan = SavingPlan(_savingsPlanName, _amount, _target, unlockTime);
         s_idToSavingPlan[s_savingPlansCounter] = savingPlan;
         s_savingPlansCounter += 1;
     }
@@ -75,29 +71,45 @@ contract Savings is Ownable {
     //  deposit
     function deposit(uint256 id, uint256 _amount) external onlyOwner {
         //    transfer the savings money from the saver to the contract
-        s_stableToken.safeTransferFrom(i_owner, address(this), _amount);
+        bool callSucess = s_stableToken.transferFrom(i_owner, address(this), _amount);
+
+        if (!callSucess) revert Savings__DepositFailed();
 
         emit FundsDesposited(i_owner, _amount);
 
-        SavingPlan memory savingPlan = s_idToSavingPlan[id];
+        SavingPlan storage savingPlan = s_idToSavingPlan[id];
 
         savingPlan.total += _amount;
     }
 
-    function withdraw(uint id) external onlyOwner {
-        SavingPlan memory savingPlan = s_idToSavingPlan[id];
+    function withdrawFromSavingPlan(uint256 _id) external onlyOwner {
+        SavingPlan storage savingPlan = s_idToSavingPlan[_id];
 
-        bool timePassed = block.timestamp > savingPlan.unlockTime;
-        if (!timePassed) {
+        if (block.timestamp < savingPlan.unlockTime) {
             revert Savings__UnlockTimeNotReached();
         }
 
         //    transfer the saved money from the contract to the saver
-        s_stableToken.safeTransfer(i_owner, savingPlan.total);
+        bool callSuccess = s_stableToken.transfer(i_owner, savingPlan.total);
+        if (!callSuccess) revert Savings__TransferFailed();
 
         savingPlan.total = 0;
+        savingPlan.target = 0;
+        savingPlan.unlockTime = 0;
 
-        emit FundsWithdrawn(i_owner, savingPlan.total);
+        // emit FundsWithdrawn(i_owner, savingPlan.total);
+    }
+
+    function withdrawFromGeneralSavings(uint256 _amount) external onlyOwner {
+        SavingPlan storage savingPlan = s_idToSavingPlan[0];
+
+        //    transfer the saved money from the contract to the saver
+        bool callSuccess = s_stableToken.transfer(i_owner, _amount);
+        if (!callSuccess) revert Savings__TransferFailed();
+
+        savingPlan.total -= _amount;
+        savingPlan.target = 0;
+        savingPlan.unlockTime = 0;
     }
 
     function getSavingPlanName(uint256 id) public view returns (string memory) {
@@ -116,5 +128,9 @@ contract Savings is Ownable {
 
     function getSavingPlan(uint256 id) public view returns (SavingPlan memory) {
         return s_idToSavingPlan[id];
+    }
+
+    function getSavingPlanBalance(uint256 _id) public view returns (uint256) {
+        return s_idToSavingPlan[_id].total;
     }
 }
