@@ -25,4 +25,4 @@ module.exports = async ({
 }
 module.exports.tags = ["usdcToken"]
 
-0x6a635201f6f72e7459a12abfedc1494cdde0d5e8
+0xf26dd089835032fc282a9cc9c6b8c9906d76ad23

@@ -25,4 +25,4 @@ module.exports = async ({
 }
 module.exports.tags = ["daiToken"]
 
-0x878f446c1c5ca9988b6dff7f38b89363cf1dc71d
+0x3bdc4d9476e32fd4cc55d491a7a11667b198bcec

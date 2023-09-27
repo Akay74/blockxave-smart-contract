@@ -20,7 +20,9 @@ module.exports = async ({
     log(`BlockXafeToken deployed at ${blockXafeToken.address}`)
 
     if (!developmentChains.includes(network.name) && process.env.ETHERSCAN_API_KEY) {
-        await verify(blockXafeToken.address, [INITIAL_SUPPLY])
+        await verify("contracts/BlockXafeToken.sol:BlockXafeToken", blockXafeToken.address, [
+            INITIAL_SUPPLY,
+        ])
     }
 }
 
