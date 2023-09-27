@@ -8,5 +8,5 @@ const networkConfig = {
         ethUsdPriceFeed: "0x694AA1769357215DE4FAC081bf1f309aDC325306",
     },
 }
-export const INITIAL_SUPPLY: string = "1000000000000000000000000"
+export const INITIAL_SUPPLY: string = "10000000000000000000000000"
 export const developmentChains: string[] = ["hardhat", "localhost"]
