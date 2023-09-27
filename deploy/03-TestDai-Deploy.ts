@@ -23,7 +23,6 @@ module.exports = async ({
         await verify("contracts/TestDai.sol:DaiToken", testDaiToken.address, [INITIAL_SUPPLY])
     }
 }
-
 module.exports.tags = ["daiToken"]
 
 0x878f446c1c5ca9988b6dff7f38b89363cf1dc71d
