@@ -83,6 +83,12 @@ contract Savings is Ownable {
         bool callSuccess = s_stableToken.transfer(i_owner, savingPlan.total);
         if (!callSuccess) revert Savings__TransferFailed();
 
+        /**
+         *
+         * if the total amount saved = saving target
+         * if the saving plan unlock time meets a certain time threshold, then transfer blockxave token according to the time threshold
+         */
+
         savingPlan.total = 0;
         savingPlan.target = 0;
         savingPlan.unlockTime = 0;
