@@ -87,6 +87,15 @@ contract Savings is Ownable {
          *
          * if the total amount saved = saving target
          * if the saving plan unlock time meets a certain time threshold, then transfer blockxave token according to the time threshold
+         * track the saving plans created by addresses
+         *  check target status with saving plan id
+         *  withdraw
+         *  if target status is positive, then get owner and target value
+         *  call the smart contract holding blockxave tokens to transfer the bonus tokens @params owner and target value
+         *
+         * create a tracker contract
+         * it should track how much is deposited each time a deposit is made, also the target and unlock time
+         * the tracker contract should also have blockxave tokens so it can incetivize users that reach their target and this incentivizatiion depends on the length of the unlock time.
          */
 
         savingPlan.total = 0;
