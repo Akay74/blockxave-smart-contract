@@ -61,15 +61,15 @@ contract TrackerAndDispensal {
         return false;
     }
 
-    function payUser(uint256 savingPlanId) public {
-        // check if user is eligible for the blockxave token bonus
-        bool userPassed = checkIfUserMeetsCriteria(msg.sender, savingPlanId);
+    // function payUser(uint256 savingPlanId) public {
+    //     // check if user is eligible for the blockxave token bonus
+    //     bool userPassed = checkIfUserMeetsCriteria(msg.sender, savingPlanId);
 
-        if (!userPassed) {
-            revert TrackerAndDispensal_User_Is_Not_Eligible();
-        }
+    //     if (!userPassed) {
+    //         revert TrackerAndDispensal_User_Is_Not_Eligible();
+    //     }
 
-        // after you have payed user
-        addressToSavingPlanInfo[msg.sender][savingPlanId].total = 0;
-    }
+    //     // after you have payed user
+    //     addressToSavingPlanInfo[msg.sender][savingPlanId].total = 0;
+    // }
 }
