@@ -47,29 +47,29 @@ contract TrackerAndDispensal {
         address owner,
         uint256 savingPlanId
     ) internal view returns (bool) {
-        SavingPlanInfo memory onwerSavingPlanInfo = addressToSavingPlanInfo[owner][savingPlanId];
+        SavingPlanInfo memory ownerSavingPlanInfo = addressToSavingPlanInfo[owner][savingPlanId];
 
         // check first if users' saving plan is created or current
-        if (onwerSavingPlanInfo.total == 0) {
+        if (ownerSavingPlanInfo.total == 0) {
             return false;
         }
 
         // check if the user meets his target
-        if (onwerSavingPlanInfo.total >= onwerSavingPlanInfo.target) {
+        if (ownerSavingPlanInfo.total >= ownerSavingPlanInfo.target) {
             return true;
         }
         return false;
     }
 
-    // function payUser(uint256 savingPlanId) public {
-    //     // check if user is eligible for the blockxave token bonus
-    //     bool userPassed = checkIfUserMeetsCriteria(msg.sender, savingPlanId);
+    function payUser(uint256 savingPlanId) public {
+        // check if user is eligible for the blockxave token bonus
+        bool userPassed = checkIfUserMeetsCriteria(msg.sender, savingPlanId);
 
-    //     if (!userPassed) {
-    //         revert TrackerAndDispensal_User_Is_Not_Eligible();
-    //     }
+        if (!userPassed) {
+            revert TrackerAndDispensal_User_Is_Not_Eligible();
+        }
 
-    //     // after you have payed user
-    //     addressToSavingPlanInfo[msg.sender][savingPlanId].total = 0;
-    // }
+        // after you have payed user
+        addressToSavingPlanInfo[msg.sender][savingPlanId].total = 0;
+    }
 }
