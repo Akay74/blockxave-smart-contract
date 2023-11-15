@@ -1,0 +1,41 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "@openzeppelin/contracts/interfaces/IERC20.sol": {
+      "content": "// SPDX-License-Identifier: MIT\n// OpenZeppelin Contracts v4.4.1 (interfaces/IERC20.sol)\n\npragma solidity ^0.8.0;\n\nimport \"../token/ERC20/IERC20.sol\";\n"
+    },
+    "@openzeppelin/contracts/token/ERC20/IERC20.sol": {
+      "content": "// SPDX-License-Identifier: MIT\n// OpenZeppelin Contracts (last updated v4.9.0) (token/ERC20/IERC20.sol)\n\npragma solidity ^0.8.0;\n\n/**\n * @dev Interface of the ERC20 standard as defined in the EIP.\n */\ninterface IERC20 {\n    /**\n     * @dev Emitted when `value` tokens are moved from one account (`from`) to\n     * another (`to`).\n     *\n     * Note that `value` may be zero.\n     */\n    event Transfer(address indexed from, address indexed to, uint256 value);\n\n    /**\n     * @dev Emitted when the allowance of a `spender` for an `owner` is set by\n     * a call to {approve}. `value` is the new allowance.\n     */\n    event Approval(address indexed owner, address indexed spender, uint256 value);\n\n    /**\n     * @dev Returns the amount of tokens in existence.\n     */\n    function totalSupply() external view returns (uint256);\n\n    /**\n     * @dev Returns the amount of tokens owned by `account`.\n     */\n    function balanceOf(address account) external view returns (uint256);\n\n    /**\n     * @dev Moves `amount` tokens from the caller's account to `to`.\n     *\n     * Returns a boolean value indicating whether the operation succeeded.\n     *\n     * Emits a {Transfer} event.\n     */\n    function transfer(address to, uint256 amount) external returns (bool);\n\n    /**\n     * @dev Returns the remaining number of tokens that `spender` will be\n     * allowed to spend on behalf of `owner` through {transferFrom}. This is\n     * zero by default.\n     *\n     * This value changes when {approve} or {transferFrom} are called.\n     */\n    function allowance(address owner, address spender) external view returns (uint256);\n\n    /**\n     * @dev Sets `amount` as the allowance of `spender` over the caller's tokens.\n     *\n     * Returns a boolean value indicating whether the operation succeeded.\n     *\n     * IMPORTANT: Beware that changing an allowance with this method brings the risk\n     * that someone may use both the old and the new allowance by unfortunate\n     * transaction ordering. One possible solution to mitigate this race\n     * condition is to first reduce the spender's allowance to 0 and set the\n     * desired value afterwards:\n     * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729\n     *\n     * Emits an {Approval} event.\n     */\n    function approve(address spender, uint256 amount) external returns (bool);\n\n    /**\n     * @dev Moves `amount` tokens from `from` to `to` using the\n     * allowance mechanism. `amount` is then deducted from the caller's\n     * allowance.\n     *\n     * Returns a boolean value indicating whether the operation succeeded.\n     *\n     * Emits a {Transfer} event.\n     */\n    function transferFrom(address from, address to, uint256 amount) external returns (bool);\n}\n"
+    },
+    "contracts/TrackerAndDispensal.sol": {
+      "content": "//SPDX-License-Identifier: MIT\npragma solidity ^0.8.4;\n\nimport \"@openzeppelin/contracts/interfaces/IERC20.sol\";\n\n//  * create a tracker contract\n//  * it should track how much is deposited each time a deposit is made, also the target and unlock time\n//  * the tracker contract should also have blockxave tokens so it can incetivize users that reach their target and this incentivizatiion depends on the length of the unlock time.\n\nerror TrackerAndDispensal_User_Is_Not_Eligible();\nerror TrackerAndDispensal__TransferFailed();\n\ncontract TrackerAndDispensal {\n    // states\n    /**\n     * @mapping address to savingPlanInfo\n     */\n\n    struct SavingPlanInfo {\n        string savingPlanName;\n        uint256 total;\n        uint256 target;\n        uint256 unlockTime;\n    }\n\n    IERC20 private s_stableToken;\n\n    mapping(address => mapping(uint => SavingPlanInfo)) private addressToIdToSavingPlanInfo;\n\n    constructor(address _blockXaveTokenAddress) {\n        s_stableToken = IERC20(_blockXaveTokenAddress);\n    }\n\n    // functions\n    /**\n     *   updateUserInfoForEveryDeposit\n     *  payUserThatMeets the criteria\n     */\n\n    function updateUserInfoForEveryDeposit(\n        SavingPlanInfo memory info,\n        uint256 savingPlanId\n    ) external {\n        addressToIdToSavingPlanInfo[msg.sender][savingPlanId] = info;\n    }\n\n    function checkIfUserMeetsCriteria(\n        address owner,\n        uint256 savingPlanId\n    ) internal view returns (bool) {\n        SavingPlanInfo memory ownerSavingPlanInfo = addressToIdToSavingPlanInfo[owner][\n            savingPlanId\n        ];\n\n        // check first if users' saving plan is created or current\n        if (ownerSavingPlanInfo.total == 0) {\n            return false;\n        }\n\n        // check if the user meets his target\n        if (ownerSavingPlanInfo.total >= ownerSavingPlanInfo.target) {\n            return true;\n        }\n        return false;\n    }\n\n    function payUser(uint256 savingPlanId) external {\n        // check if user is eligible for the blockxave token bonus\n        bool userPassed = checkIfUserMeetsCriteria(msg.sender, savingPlanId);\n\n        if (!userPassed) {\n            revert TrackerAndDispensal_User_Is_Not_Eligible();\n        }\n\n        SavingPlanInfo memory ownerSavingPlanInfo = addressToIdToSavingPlanInfo[msg.sender][\n            savingPlanId\n        ];\n\n        // pay user\n\n        bool callSuccess = s_stableToken.transfer(msg.sender, ownerSavingPlanInfo.total);\n        if (!callSuccess) revert TrackerAndDispensal__TransferFailed();\n\n        // after you have payed user\n        addressToIdToSavingPlanInfo[msg.sender][savingPlanId].total = 0;\n    }\n}\n"
+    }
+  },
+  "settings": {
+    "optimizer": {
+      "enabled": false,
+      "runs": 200
+    },
+    "outputSelection": {
+      "*": {
+        "*": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata",
+          "devdoc",
+          "userdoc",
+          "storageLayout",
+          "evm.gasEstimates"
+        ],
+        "": [
+          "ast"
+        ]
+      }
+    },
+    "metadata": {
+      "useLiteralContent": true
+    }
+  }
+}
