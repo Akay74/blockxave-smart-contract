@@ -58,6 +58,10 @@ contract Savings is Ownable {
         }
     }
 
+    /*
+     * Once someone creates a new plan,
+     */
+
     //  deposit
     function deposit(uint256 id, uint256 _amount) external onlyOwner {
         //    transfer the savings money from the saver to the contract
