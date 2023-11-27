@@ -10,7 +10,7 @@ module.exports = async ({
 }: HardhatRuntimeEnvironment): Promise<void> => {
     const { deploy, log } = deployments
     const { deployer } = await getNamedAccounts()
-    const blockXafeToken = await deploy("BlockXafeToken", {
+    const blockXafeToken = await deploy("BlockXaveToken", {
         from: deployer,
         args: [INITIAL_SUPPLY],
         log: true,

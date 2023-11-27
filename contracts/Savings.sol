@@ -2,18 +2,20 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
-error Savings__UnlockTimeNotReached();
-error Savings__DepositFailed();
-error Savings__TransferFailed();
+
+    error Savings__UnlockTimeNotReached();
+    error Savings__DepositFailed();
+    error Savings__TransferFailed();
+
+/*
+* @contract Savings Contract
+* @author Ejim Favour
+*/
 
 contract Savings is Ownable {
     // Type Declarations
-    using SafeERC20 for IERC20;
-
     struct SavingPlan {
         string savingPlanName;
         uint256 total;
@@ -31,43 +33,56 @@ contract Savings is Ownable {
     event FundsDesposited(address indexed saver, uint256 amount);
     event FundsWithdrawn(address indexed saver, uint256 amount);
 
+    /*
+    * @param _savingsName and _stableTokenAddress
+    */
     constructor(string memory _savingsName, address _stableTokenAddress) {
         s_savingsName = _savingsName;
         i_owner = msg.sender;
         s_stableToken = IERC20(_stableTokenAddress);
     }
 
+    // Fallback function must be declared as external.
+    fallback() external payable {
+        getContractBalance();
+    }
+
+    // Receive is a variant of fallback that is triggered when msg.data is empty
+    receive() external payable {
+        getContractBalance();
+    }
+
+    /*
+    * @param _savingsPlanName, _amount. _target, _unlockTime
+    * @func it is a function for creating a saving plan
+    */
     function createSavingPlan(
         string memory _savingsPlanName,
         uint256 _amount,
         uint256 _target,
         uint256 _unlockTime
-    ) external onlyOwner returns (uint256) {
-        s_stableToken.transferFrom(i_owner, address(this), _amount);
+    ) external onlyOwner {
+        bool callSuccess = s_stableToken.transferFrom(i_owner, address(this), _amount);
+
+        if (!callSuccess) revert Savings__DepositFailed();
 
         uint256 unlockTime = block.timestamp + (_unlockTime * 1 days);
 
         SavingPlan memory savingPlan = SavingPlan(_savingsPlanName, _amount, _target, unlockTime);
         s_idToSavingPlan[s_savingPlansCounter] = savingPlan;
         s_savingPlansCounter += 1;
-
-        if (s_savingPlansCounter == 0) {
-            return s_savingPlansCounter;
-        } else {
-            return s_savingPlansCounter - 1;
-        }
     }
 
     /*
-     * Once someone creates a new plan,
-     */
-
+    * @param id and _amount
+    * @func it is a function for depositing into a saving plan
+    */
     //  deposit
     function deposit(uint256 id, uint256 _amount) external onlyOwner {
         //    transfer the savings money from the saver to the contract
-        bool callSucess = s_stableToken.transferFrom(i_owner, address(this), _amount);
+        bool callSuccess = s_stableToken.transferFrom(i_owner, address(this), _amount);
 
-        if (!callSucess) revert Savings__DepositFailed();
+        if (!callSuccess) revert Savings__DepositFailed();
 
         emit FundsDesposited(i_owner, _amount);
 
@@ -76,6 +91,10 @@ contract Savings is Ownable {
         savingPlan.total += _amount;
     }
 
+    /*
+    * @param _id
+    * @func it is a function for withdrawing from a saving plan
+    */
     function withdrawFromSavingPlan(uint256 _id) external onlyOwner {
         SavingPlan storage savingPlan = s_idToSavingPlan[_id];
 
@@ -86,21 +105,6 @@ contract Savings is Ownable {
         //    transfer the saved money from the contract to the saver
         bool callSuccess = s_stableToken.transfer(i_owner, savingPlan.total);
         if (!callSuccess) revert Savings__TransferFailed();
-
-        /**
-         *
-         * if the total amount saved = saving target
-         * if the saving plan unlock time meets a certain time threshold, then transfer blockxave token according to the time threshold
-         * track the saving plans created by addresses
-         *  check target status with saving plan id
-         *  withdraw
-         *  if target status is positive, then get owner and target value
-         *  call the smart contract holding blockxave tokens to transfer the bonus tokens @params owner and target value
-         *
-         * create a tracker contract
-         * it should track how much is deposited each time a deposit is made, also the target and unlock time
-         * the tracker contract should also have blockxave tokens so it can incetivize users that reach their target and this incentivizatiion depends on the length of the unlock time.
-         */
 
         savingPlan.total = 0;
         savingPlan.target = 0;
