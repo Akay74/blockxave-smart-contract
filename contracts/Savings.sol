@@ -111,13 +111,16 @@ contract Savings is Ownable {
     function withdrawFromSavingPlan(uint256 _id) external onlyOwner {
         SavingPlan storage savingPlan = s_idToSavingPlan[_id];
 
-        if (block.timestamp < savingPlan.unlockTime) {
+        if (block.timestamp < savingPlan.unlockTime && savingPlan.fixedPlan) {
             revert Savings__UnlockTimeNotReached();
+        } else if (block.timestamp < savingPlan.unlockTime && !savingPlan.fixedPlan) {
+            bool callSuccess = s_stableToken.transfer(i_owner, savingPlan.total);
+            if (!callSuccess) revert Savings__TransferFailed();
+        } else {
+            //    transfer the saved money from the contract to the saver
+            bool callSuccess = s_stableToken.transfer(i_owner, savingPlan.total);
+            if (!callSuccess) revert Savings__TransferFailed();
         }
-
-        //    transfer the saved money from the contract to the saver
-        bool callSuccess = s_stableToken.transfer(i_owner, savingPlan.total);
-        if (!callSuccess) revert Savings__TransferFailed();
 
         savingPlan.total = 0;
         savingPlan.target = 0;
