@@ -4,12 +4,6 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-// user actions
-// deploy savings contract
-// create a saving plan
-// deposit into the saving plan
-// withdraw from the saving plan
-
 error Savings__UnlockTimeNotReached();
 error Savings__DepositFailed();
 error Savings__TransferFailed();
