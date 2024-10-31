@@ -1,19 +1,25 @@
-//SPDX-License-Idenditifier: MIT;
-pragma solidity ^0.8.4;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.26;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-error Savings__UnlockTimeNotReached();
-error Savings__DepositFailed();
-error Savings__TransferFailed();
-
-/*
- * @contract Savings Contract
- * @author Ejim Favour
+/**
+ * @title Savings Contract
+ * @author Original: Ejim Favour, Refactored by Akay
+ * @notice This contract allows users to create and manage various savings plans using stablecoins
+ * @dev Implements saving plans with both fixed and flexible withdrawal options
  */
 
-contract Savings is Ownable {
+error SavingsUnlockTimeNotReached();
+error SavingsDepositFailed();
+error SavingsTransferFailed();
+error SavingsInvalidAmount();
+error SavingsInvalidPlanId();
+error SavingsInvalidUnlockTime();
+
+contract Savings is Ownable, ReentrancyGuard {
     // Type Declarations
     struct SavingPlan {
         string savingPlanName;
@@ -23,38 +29,53 @@ contract Savings is Ownable {
         uint256 unlockTime;
     }
 
-    IERC20 private s_stableToken;
-
-    string private s_savingsName;
-    address private immutable i_owner;
+    IERC20 private immutable s_stableToken;
+    string private immutable s_savingsName;
+    
     mapping(uint256 => SavingPlan) private s_idToSavingPlan;
     uint256 private s_savingPlansCounter;
 
-    event FundsDesposited(address indexed saver, uint256 amount);
-    event FundsWithdrawn(address indexed saver, uint256 amount);
+    event FundsDeposited(
+        address indexed saver, 
+        uint256 indexed planId, 
+        uint256 amount, 
+        uint256 newTotal
+    );
+    event FundsWithdrawn(
+        address indexed saver, 
+        uint256 indexed planId, 
+        uint256 amount
+    );
+    event SavingPlanCreated(
+        uint256 indexed planId, 
+        string planName, 
+        bool fixedPlan, 
+        uint256 target
+    );
 
-    /*
-     * @param _savingsName and _stableTokenAddress
+    /**
+     * @notice Initialize the savings contract with a name and stablecoin address
+     * @param _savingsName Name of the savings contract
+     * @param _stableTokenAddress Address of the stablecoin to be used
      */
-    constructor(string memory _savingsName, address _stableTokenAddress) {
+    constructor(
+        string memory _savingsName, 
+        address _stableTokenAddress
+    ) Ownable(msg.sender) {
+        if (_stableTokenAddress == address(0)) revert SavingsInvalidAmount();
+        
         s_savingsName = _savingsName;
-        i_owner = msg.sender;
         s_stableToken = IERC20(_stableTokenAddress);
     }
 
-    // Fallback function must be declared as external.
-    fallback() external payable {
-        getContractBalance();
-    }
-
-    // Receive is a variant of fallback that is triggered when msg.data is empty
-    receive() external payable {
-        getContractBalance();
-    }
-
-    /*
-     * @param _savingsPlanName, _amount. _target, _unlockTime
-     * @func it is a function for creating a saving plan
+    /**
+     * @notice Creates a new saving plan
+     * @param _savingsPlanName Name of the savings plan
+     * @param _fixedPlan Whether the plan has a fixed lock period
+     * @param _amount Initial deposit amount
+     * @param _target Target savings amount
+     * @param _unlockTime Lock period in days
+     * @return planId The ID of the created savings plan
      */
     function createSavingPlan(
         string memory _savingsPlanName,
@@ -62,86 +83,126 @@ contract Savings is Ownable {
         uint256 _amount,
         uint256 _target,
         uint256 _unlockTime
-    ) external onlyOwner {
-        bool callSuccess = s_stableToken.transferFrom(i_owner, address(this), _amount);
+    ) external onlyOwner nonReentrant returns (uint256 planId) {
+        if (_amount == 0) revert SavingsInvalidAmount();
+        if (_unlockTime == 0) revert SavingsInvalidUnlockTime();
 
-        if (!callSuccess) revert Savings__DepositFailed();
+        bool success = s_stableToken.transferFrom(msg.sender, address(this), _amount);
+        if (!success) revert SavingsDepositFailed();
 
         uint256 unlockTime = block.timestamp + (_unlockTime * 1 days);
-
-        SavingPlan memory savingPlan = SavingPlan(
+        
+        planId = s_savingPlansCounter++;
+        s_idToSavingPlan[planId] = SavingPlan(
             _savingsPlanName,
             _fixedPlan,
             _amount,
             _target,
             unlockTime
         );
-        s_idToSavingPlan[s_savingPlansCounter] = savingPlan;
-        s_savingPlansCounter += 1;
+
+        emit SavingPlanCreated(planId, _savingsPlanName, _fixedPlan, _target);
+        emit FundsDeposited(msg.sender, planId, _amount, _amount);
     }
 
-    /*
-     * @param id and _amount
-     * @func it is a function for depositing into a saving plan
+    /**
+     * @notice Deposits funds into an existing saving plan
+     * @param id The savings plan ID
+     * @param _amount Amount to deposit
      */
-    //  deposit
-    function deposit(uint256 id, uint256 _amount) external onlyOwner {
-        //    transfer the savings money from the saver to the contract
-        bool callSuccess = s_stableToken.transferFrom(i_owner, address(this), _amount);
+    function deposit(
+        uint256 id, 
+        uint256 _amount
+    ) external onlyOwner nonReentrant {
+        if (_amount == 0) revert SavingsInvalidAmount();
+        if (id >= s_savingPlansCounter) revert SavingsInvalidPlanId();
 
-        if (!callSuccess) revert Savings__DepositFailed();
-
-        emit FundsDesposited(i_owner, _amount);
+        bool success = s_stableToken.transferFrom(msg.sender, address(this), _amount);
+        if (!success) revert SavingsDepositFailed();
 
         SavingPlan storage savingPlan = s_idToSavingPlan[id];
+        uint256 newTotal = savingPlan.total + _amount;
+        savingPlan.total = newTotal;
 
-        savingPlan.total += _amount;
+        emit FundsDeposited(msg.sender, id, _amount, newTotal);
     }
 
-    /*
-     * @param _id
-     * @func it is a function for withdrawing from a saving plan
+    /**
+     * @notice Withdraws funds from a saving plan
+     * @param _id The savings plan ID
      */
-    function withdrawFromSavingPlan(uint256 _id) external onlyOwner {
+    function withdrawFromSavingPlan(
+        uint256 _id
+    ) external onlyOwner nonReentrant {
+        if (_id >= s_savingPlansCounter) revert SavingsInvalidPlanId();
+
         SavingPlan storage savingPlan = s_idToSavingPlan[_id];
+        uint256 withdrawAmount = savingPlan.total;
 
         if (block.timestamp < savingPlan.unlockTime && savingPlan.fixedPlan) {
-            revert Savings__UnlockTimeNotReached();
-        } else if (block.timestamp < savingPlan.unlockTime && !savingPlan.fixedPlan) {
-            bool callSuccess = s_stableToken.transfer(i_owner, savingPlan.total);
-            if (!callSuccess) revert Savings__TransferFailed();
-        } else {
-            //    transfer the saved money from the contract to the saver
-            bool callSuccess = s_stableToken.transfer(i_owner, savingPlan.total);
-            if (!callSuccess) revert Savings__TransferFailed();
+            revert SavingsUnlockTimeNotReached();
         }
 
+        // Update state before external call to prevent reentrancy
         savingPlan.total = 0;
         savingPlan.target = 0;
         savingPlan.unlockTime = 0;
 
-        emit FundsWithdrawn(i_owner, savingPlan.total);
+        bool success = s_stableToken.transfer(msg.sender, withdrawAmount);
+        if (!success) revert SavingsTransferFailed();
+
+        emit FundsWithdrawn(msg.sender, _id, withdrawAmount);
     }
 
-    function getSavingPlanName(uint256 id) public view returns (string memory) {
-        SavingPlan memory savingPlan = s_idToSavingPlan[id];
-        return savingPlan.savingPlanName;
+    /**
+     * @notice Gets the name of a specific saving plan
+     * @param id The savings plan ID
+     * @return The name of the saving plan
+     */
+    function getSavingPlanName(
+        uint256 id
+    ) external view returns (string memory) {
+        if (id >= s_savingPlansCounter) revert SavingsInvalidPlanId();
+        return s_idToSavingPlan[id].savingPlanName;
     }
 
-    function getContractBalance() public view returns (uint256) {
-        uint256 contractBalance = s_stableToken.balanceOf(address(this));
-        return contractBalance;
+    /**
+     * @notice Gets the total balance of the contract
+     * @return The contract's total balance
+     */
+    function getContractBalance() external view returns (uint256) {
+        return s_stableToken.balanceOf(address(this));
     }
 
-    function getSavingPlanCount() public view returns (uint256) {
+    /**
+     * @notice Gets the total number of saving plans
+     * @return The number of saving plans
+     */
+    function getSavingPlanCount() external view returns (uint256) {
         return s_savingPlansCounter;
     }
 
-    function getSavingPlan(uint256 id) public view returns (SavingPlan memory) {
+    /**
+     * @notice Gets the details of a specific saving plan
+     * @param id The savings plan ID
+     * @return The saving plan details
+     */
+    function getSavingPlan(
+        uint256 id
+    ) external view returns (SavingPlan memory) {
+        if (id >= s_savingPlansCounter) revert SavingsInvalidPlanId();
         return s_idToSavingPlan[id];
     }
 
-    function getSavingPlanBalance(uint256 _id) public view returns (uint256) {
+    /**
+     * @notice Gets the balance of a specific saving plan
+     * @param _id The savings plan ID
+     * @return The balance of the saving plan
+     */
+    function getSavingPlanBalance(
+        uint256 _id
+    ) external view returns (uint256) {
+        if (_id >= s_savingPlansCounter) revert SavingsInvalidPlanId();
         return s_idToSavingPlan[_id].total;
     }
 }
