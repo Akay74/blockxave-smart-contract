@@ -14,34 +14,13 @@ const COIN_MARKET_API_KEY = process.env.COIN_MARKET_API_KEY || ""
 
 /** @type import('hardhat/config').HardhatUserConfig */
 const config: HardhatUserConfig = {
-    solidity: "0.8.19",
+    solidity: "0.8.26",
     networks: {
         hardhat: {
             chainId: 31337,
         },
-        sepolia: {
-            url: SEPOLIA_URL,
-            accounts: [SEPOLIA_PRIVATE_KEY],
-            chainId: 11155111,
-        },
-    },
-    etherscan: {
-        apiKey: {
-            sepolia: ETHERSCAN_API_KEY,
-        },
-    },
-    gasReporter: {
-        enabled: true,
-        coinmarketcap: COIN_MARKET_API_KEY,
-        currency: "USD",
-        noColors: true,
-        outputFile: "gas-reporter.csv",
-    },
-    namedAccounts: {
-        deployer: {
-            default: 0,
-        },
-    },
+    }
 }
+
 
 export default config
