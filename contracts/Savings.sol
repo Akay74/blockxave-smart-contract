@@ -12,6 +12,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
  * @dev Implements saving plans with both fixed and flexible withdrawal options
  */
 
+/** */
 error SavingsUnlockTimeNotReached();
 error SavingsDepositFailed();
 error SavingsTransferFailed();
@@ -29,8 +30,8 @@ contract Savings is Ownable, ReentrancyGuard {
         uint256 unlockTime;
     }
 
-    IERC20 private immutable s_stableToken;
-    string private immutable s_savingsName;
+    IERC20 private s_stableToken;
+    string private s_savingsName;
     
     mapping(uint256 => SavingPlan) private s_idToSavingPlan;
     uint256 private s_savingPlansCounter;
@@ -61,7 +62,7 @@ contract Savings is Ownable, ReentrancyGuard {
     constructor(
         string memory _savingsName, 
         address _stableTokenAddress
-    ) Ownable(msg.sender) {
+    ) Ownable() {
         if (_stableTokenAddress == address(0)) revert SavingsInvalidAmount();
         
         s_savingsName = _savingsName;
