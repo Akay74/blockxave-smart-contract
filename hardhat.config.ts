@@ -1,6 +1,7 @@
 import { HardhatUserConfig } from "hardhat/types/config"
 import "hardhat/config"
 import "@nomicfoundation/hardhat-toolbox"
+import "@typechain/hardhat"
 import * as dotenv from "dotenv"
 import "hardhat-deploy"
 import "hardhat-gas-reporter"
