@@ -12,15 +12,15 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
  * @dev Implements saving plans with both fixed and flexible withdrawal options
  */
 
-/** */
-error SavingsUnlockTimeNotReached();
-error SavingsDepositFailed();
-error SavingsTransferFailed();
-error SavingsInvalidAmount();
-error SavingsInvalidPlanId();
-error SavingsInvalidUnlockTime();
-
 contract Savings is Ownable, ReentrancyGuard {
+    
+    error SavingsUnlockTimeNotReached();
+    error SavingsDepositFailed();
+    error SavingsTransferFailed();
+    error SavingsInvalidAmount();
+    error SavingsInvalidPlanId();
+    error SavingsInvalidUnlockTime();
+
     // Type Declarations
     struct SavingPlan {
         string savingPlanName;
